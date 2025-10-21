@@ -29,6 +29,9 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'oauth_provider' => fake()->optional(0.3)->randomElement(['google', 'facebook', 'twitter']),
+            'oauth_id' => fake()->optional(0.3)->numerify('##########'),
+            'profile_image' => fake()->optional(0.4)->imageUrl(200, 200, 'people'),
         ];
     }
 
