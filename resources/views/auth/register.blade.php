@@ -4,21 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crear Cuenta - UANFilms</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'dark-blue': '#1a1a2e',
-                        'electric-blue': '#00d4ff',
-                        'navy': '#16213e',
-                        'slate-dark': '#0f172a'
-                    }
-                }
-            }
-        }
-    </script>
+    @vite('resources/css/app.css')
 </head>
 <body class="bg-slate-dark min-h-screen flex items-center justify-center py-8">
     <div class="w-full max-w-md">
