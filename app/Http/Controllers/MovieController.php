@@ -24,6 +24,10 @@ class MovieController extends Controller
 
         $movies = Movie::query();
 
+        if ($request->boolean('owned')) {
+            $movies->where('user_id', Auth::user()->id);
+        }
+
         if ($request->has('search')) {
             $movies->where('title', 'like', '%'.$request->search.'%');
         }
