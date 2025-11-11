@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -11,53 +12,30 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    /**
-     * Mostrar el formulario de login
-     */
-    public function showLoginForm()
-    {
-        return view('auth.login');
-    }
-
-    /**
-     * Mostrar el formulario de registro
-     */
-    public function showRegisterForm()
-    {
-        return view('auth.register');
-    }
-
+    const AUTH_FIELDS = ['id', 'name', 'email', 'profile_image'];
     /**
      * Procesar el login del usuario
      */
-    public function login(Request $request)
+    public function login(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $credentials = $request->validate([
             'email' => 'required|email',
-            'password' => 'required|min:6',
-        ], [
-            'email.required' => 'El email es obligatorio',
-            'email.email' => 'El email debe tener un formato válido',
-            'password.required' => 'La contraseña es obligatoria',
-            'password.min' => 'La contraseña debe tener al menos 6 caracteres',
+            'password' => 'required',
         ]);
 
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
+        if (Auth::attempt($credentials, $request->has('remember'))) {
+            return response()->json([
+                'message' => '¡Bienvenido! Has iniciado sesión correctamente.',
+                'data' => [
+                    'user' => Auth::user()->only(self::AUTH_FIELDS),
+                    'token' => Auth::user()->createToken('auth_token')->plainTextToken,
+                ],
+            ]);
         }
 
-        $credentials = $request->only('email', 'password');
-        $remember = $request->has('remember');
-
-        if (Auth::attempt($credentials, $remember)) {
-            $request->session()->regenerate();
-            
-            return redirect()->intended('/')->with('success', '¡Bienvenido! Has iniciado sesión correctamente.');
-        }
-
-        return back()->withErrors([
-            'email' => 'Las credenciales proporcionadas no coinciden con nuestros registros.',
-        ])->withInput();
+        return response()->json([
+            'message' => 'Las credenciales proporcionadas no coinciden con nuestros registros.',
+        ], 401);
     }
 
     /**
