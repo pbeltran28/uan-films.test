@@ -7,8 +7,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -41,48 +39,54 @@ class AuthController extends Controller
     /**
      * Procesar el registro del usuario
      */
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6|confirmed',
-        ], [
-            'name.required' => 'El nombre es obligatorio',
-            'name.max' => 'El nombre no puede tener más de 255 caracteres',
-            'email.required' => 'El email es obligatorio',
-            'email.email' => 'El email debe tener un formato válido',
-            'email.unique' => 'Este email ya está registrado',
-            'password.required' => 'La contraseña es obligatoria',
-            'password.min' => 'La contraseña debe tener al menos 6 caracteres',
-            'password.confirmed' => 'Las contraseñas no coinciden',
         ]);
-
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
-        }
 
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
         ]);
 
-        Auth::login($user);
+        $token = $user->createToken('auth_token')->plainTextToken;
 
-        return redirect('/')->with('success', '¡Cuenta creada exitosamente! Bienvenido a UANFilms.');
+        return response()->json([
+            'message' => '¡Cuenta creada exitosamente! Bienvenido a UANFilms.',
+            'data' => [
+                'user' => $user->only(self::AUTH_FIELDS),
+                'token' => $token,
+            ],
+        ], 201);
     }
 
     /**
      * Cerrar sesión del usuario
      */
-    public function logout(Request $request)
+    public function logout(Request $request): JsonResponse
     {
-        Auth::logout();
+        // Eliminar el token actual del usuario
+        $request->user()->tokens()->delete();
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        return response()->json([
+            'message' => 'Has cerrado sesión correctamente.',
+        ]);
+    }
 
-        return redirect('/')->with('success', 'Has cerrado sesión correctamente.');
+    /**
+     * Obtener información del usuario autenticado
+     */
+    public function me(Request $request): JsonResponse
+    {
+        return response()->json([
+            'message' => 'Usuario autenticado',
+            'data' => [
+                'user' => $request->user()->only(self::AUTH_FIELDS),
+            ],
+        ]);
     }
 }
