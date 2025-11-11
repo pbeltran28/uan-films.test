@@ -4,7 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Genre;
 use Illuminate\Database\Eloquent\Factories\Factory;
-
+use Illuminate\Support\Str;
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Movie>
  */
@@ -41,8 +41,10 @@ class MovieFactory extends Factory
             'Orson Welles, Joseph Cotten, Dorothy Comingore'
         ];
 
+        $title = fake()->randomElement($titles);
         return [
-            'title' => fake()->randomElement($titles),
+            'title' => $title,
+            'slug' => Str::slug($title."-".Str::random(10)),
             'release_year' => fake()->numberBetween(1950, 2024),
             'synopsis' => fake()->paragraph(3),
             'director' => fake()->randomElement($directors),
