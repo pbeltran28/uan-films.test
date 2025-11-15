@@ -123,15 +123,6 @@ export default function MoviePage(props: MoviePageProps) {
     }
   };
 
-  // Parsear el cast como string a array
-  const parseCast = (castString: string): string[] => {
-    if (!castString) return [];
-    return castString
-      .split(",")
-      .map((actor) => actor.trim())
-      .filter(Boolean);
-  };
-
   // Convertir vote_average a número
   const getRating = (): number => {
     if (!movie) return 0;
@@ -192,7 +183,6 @@ export default function MoviePage(props: MoviePageProps) {
   }
 
   const backdropImage = movie.poster_path || "";
-  const castArray = parseCast(movie.cast);
   const movieRating = getRating();
 
   return (
@@ -327,21 +317,6 @@ export default function MoviePage(props: MoviePageProps) {
                         }
                       )}
                     </p>
-                  </div>
-                )}
-                {castArray.length > 0 && (
-                  <div>
-                    <span className="font-semibold text-white">Reparto:</span>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {castArray.map((actor, index) => (
-                        <span
-                          key={index}
-                          className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-sm"
-                        >
-                          {actor}
-                        </span>
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>
