@@ -1,153 +1,92 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import MovieCard from "@/components/movie-card";
-import { Heart, Star, MessageSquare, Film } from "lucide-react";
-
-// Mock data - en producción esto vendría del backend
-const mockStats = {
-  total_likes: 42,
-  average_rating: 4.3,
-  total_reviews: 18,
-  favorite_genre: "Ciencia Ficción",
-};
-
-const mockRecentLikes = [
-  {
-    id: 1,
-    title: "Inception",
-    poster_path: "https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg",
-    release_year: 2010,
-    slug: "inception-2010",
-  },
-  {
-    id: 2,
-    title: "Interstellar",
-    poster_path: "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg",
-    release_year: 2014,
-    slug: "interstellar-2014",
-  },
-  {
-    id: 3,
-    title: "The Matrix",
-    poster_path: "https://image.tmdb.org/t/p/w500/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg",
-    release_year: 1999,
-    slug: "the-matrix-1999",
-  },
-  {
-    id: 4,
-    title: "Blade Runner 2049",
-    poster_path: "https://image.tmdb.org/t/p/w500/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg",
-    release_year: 2017,
-    slug: "blade-runner-2049-2017",
-  },
-  {
-    id: 5,
-    title: "Dune",
-    poster_path: "https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV94XAgMIckC.jpg",
-    release_year: 2021,
-    slug: "dune-2021",
-  },
-];
-
-const mockMovies = [
-  {
-    id: 1,
-    title: "Inception",
-    poster_path: "https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg",
-    release_year: 2010,
-    rating: 8.8,
-    slug: "inception-2010",
-    genre_id: 1,
-  },
-  {
-    id: 2,
-    title: "The Shawshank Redemption",
-    poster_path: "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
-    release_year: 1994,
-    rating: 9.3,
-    slug: "shawshank-redemption-1994",
-    genre_id: 2,
-  },
-  {
-    id: 3,
-    title: "The Dark Knight",
-    poster_path: "https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg",
-    release_year: 2008,
-    rating: 9.0,
-    slug: "dark-knight-2008",
-    genre_id: 3,
-  },
-  {
-    id: 4,
-    title: "Pulp Fiction",
-    poster_path: "https://image.tmdb.org/t/p/w500/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg",
-    release_year: 1994,
-    rating: 8.9,
-    slug: "pulp-fiction-1994",
-    genre_id: 4,
-  },
-  {
-    id: 5,
-    title: "Forrest Gump",
-    poster_path: "https://image.tmdb.org/t/p/w500/arw2vcBveWOVZr6pxd9XTd1TdQa.jpg",
-    release_year: 1994,
-    rating: 8.8,
-    slug: "forrest-gump-1994",
-    genre_id: 2,
-  },
-  {
-    id: 6,
-    title: "The Matrix",
-    poster_path: "https://image.tmdb.org/t/p/w500/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg",
-    release_year: 1999,
-    rating: 8.7,
-    slug: "the-matrix-1999",
-    genre_id: 1,
-  },
-  {
-    id: 7,
-    title: "Interstellar",
-    poster_path: "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg",
-    release_year: 2014,
-    rating: 8.6,
-    slug: "interstellar-2014",
-    genre_id: 1,
-  },
-  {
-    id: 8,
-    title: "Gladiator",
-    poster_path: "https://image.tmdb.org/t/p/w500/ty8TGRuvJLPUmAR1H1nRIsgwvim.jpg",
-    release_year: 2000,
-    rating: 8.5,
-    slug: "gladiator-2000",
-    genre_id: 3,
-  },
-];
-
-const mockGenres = [
-  { id: 1, name: "Ciencia Ficción", movies_count: 3 },
-  { id: 2, name: "Drama", movies_count: 2 },
-  { id: 3, name: "Acción", movies_count: 2 },
-  { id: 4, name: "Crimen", movies_count: 1 },
-];
+import { Star, MessageSquare, Film } from "lucide-react";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { useAuthStore } from "@/store/auth.store";
+import AppLayout from "@/components/layouts/app-layout";
+import { getMovies, getGenres, getUserSummary } from "@/services/movie.service";
+import { MovieCard as MovieCardType } from "@/types/movie";
+import { PaginatedResponse, UserSummary } from "@/types/gloabal";
+import { Genre } from "@/types/movie";
 
 export default function HomePage() {
+  const { isChecking } = useAuthGuard();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [selectedGenreId, setSelectedGenreId] = useState<number | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(true); // Mock - en producción vendría del estado de autenticación
-
-  // Filtrar películas por género
-  const filteredMovies = selectedGenreId
-    ? mockMovies.filter((movie) => movie.genre_id === selectedGenreId)
-    : mockMovies;
+  const [movies, setMovies] = useState<MovieCardType[]>([]);
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [pagination, setPagination] =
+    useState<PaginatedResponse<MovieCardType> | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingMovies, setIsLoadingMovies] = useState(false);
+  const [userSummary, setUserSummary] = useState<UserSummary | null>(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
   const handleGenreChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const genreId = e.target.value ? parseInt(e.target.value) : null;
     setSelectedGenreId(genreId);
+    setCurrentPage(1); // Resetear a la primera página al cambiar género
   };
 
+  // Cargar géneros y resumen del usuario
+  useEffect(() => {
+    const loadData = async () => {
+      if (isAuthenticated) {
+        setIsLoadingSummary(true);
+        const summaryResult = await getUserSummary();
+        if (summaryResult.isSuccess && summaryResult.data) {
+          setUserSummary(summaryResult.data);
+        }
+        setIsLoadingSummary(false);
+      }
+
+      const result = await getGenres();
+      if (result.isSuccess && result.data) {
+        setGenres(result.data);
+      }
+    };
+    loadData();
+  }, [isAuthenticated]);
+
+  // Cargar películas
+  useEffect(() => {
+    const loadMovies = async () => {
+      setIsLoadingMovies(true);
+      const params: { page?: number; per_page?: number; genre_id?: number } = {
+        page: currentPage,
+        per_page: 12,
+      };
+
+      if (selectedGenreId) {
+        params.genre_id = selectedGenreId;
+      }
+
+      const result = await getMovies(params);
+      if (result.isSuccess && result.data) {
+        setMovies(result.data.data);
+        setPagination(result.data);
+      }
+      setIsLoadingMovies(false);
+    };
+    loadMovies();
+  }, [selectedGenreId, currentPage]);
+
+  // Mostrar loading mientras se verifica la autenticación
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <AppLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Sección de Estadísticas - Solo para usuarios autenticados */}
         {isAuthenticated && (
@@ -157,86 +96,79 @@ export default function HomePage() {
             </h2>
 
             {/* Grid de estadísticas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {/* Total Likes */}
-              <div className="bg-slate-900/60 backdrop-blur-xl rounded-xl p-6 border border-slate-800/50 hover:border-blue-500/50 transition-all duration-300 transform hover:scale-105">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-400 text-sm mb-1">
-                      Películas que me gustaron
-                    </p>
-                    <p className="text-3xl font-bold text-blue-400">
-                      {mockStats.total_likes}
-                    </p>
-                  </div>
-                  <div className="bg-blue-500/20 p-3 rounded-lg">
-                    <Heart className="w-8 h-8 text-blue-400 fill-blue-400" />
+            {isLoadingSummary ? (
+              <div className="flex justify-center items-center py-12 mb-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+              </div>
+            ) : userSummary ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {/* Average Rating */}
+                <div className="bg-slate-900/60 backdrop-blur-xl rounded-xl p-6 border border-slate-800/50 hover:border-yellow-500/50 transition-all duration-300 transform hover:scale-105">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">
+                        Calificación Promedio
+                      </p>
+                      <p className="text-3xl font-bold text-yellow-500">
+                        {userSummary.summary.average_rating.toFixed(1)}
+                      </p>
+                    </div>
+                    <div className="bg-yellow-500/20 p-3 rounded-lg">
+                      <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Average Rating */}
-              <div className="bg-slate-900/60 backdrop-blur-xl rounded-xl p-6 border border-slate-800/50 hover:border-yellow-500/50 transition-all duration-300 transform hover:scale-105">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-400 text-sm mb-1">
-                      Calificación Promedio
-                    </p>
-                    <p className="text-3xl font-bold text-yellow-500">
-                      {mockStats.average_rating.toFixed(1)}
-                    </p>
-                  </div>
-                  <div className="bg-yellow-500/20 p-3 rounded-lg">
-                    <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
+                {/* Total Reviews */}
+                <div className="bg-slate-900/60 backdrop-blur-xl rounded-xl p-6 border border-slate-800/50 hover:border-green-500/50 transition-all duration-300 transform hover:scale-105">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">
+                        Reseñas Escritas
+                      </p>
+                      <p className="text-3xl font-bold text-green-500">
+                        {userSummary.summary.total_reviews}
+                      </p>
+                    </div>
+                    <div className="bg-green-500/20 p-3 rounded-lg">
+                      <MessageSquare className="w-8 h-8 text-green-500" />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Total Reviews */}
-              <div className="bg-slate-900/60 backdrop-blur-xl rounded-xl p-6 border border-slate-800/50 hover:border-green-500/50 transition-all duration-300 transform hover:scale-105">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-400 text-sm mb-1">
-                      Reseñas Escritas
-                    </p>
-                    <p className="text-3xl font-bold text-green-500">
-                      {mockStats.total_reviews}
-                    </p>
-                  </div>
-                  <div className="bg-green-500/20 p-3 rounded-lg">
-                    <MessageSquare className="w-8 h-8 text-green-500" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Favorite Genre */}
-              <div className="bg-slate-900/60 backdrop-blur-xl rounded-xl p-6 border border-slate-800/50 hover:border-purple-500/50 transition-all duration-300 transform hover:scale-105">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-400 text-sm mb-1">
-                      Género Favorito
-                    </p>
-                    <p className="text-xl font-bold text-purple-500">
-                      {mockStats.favorite_genre}
-                    </p>
-                  </div>
-                  <div className="bg-purple-500/20 p-3 rounded-lg">
-                    <Film className="w-8 h-8 text-purple-500" />
+                {/* Favorite Genre */}
+                <div className="bg-slate-900/60 backdrop-blur-xl rounded-xl p-6 border border-slate-800/50 hover:border-purple-500/50 transition-all duration-300 transform hover:scale-105">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">
+                        Género Favorito
+                      </p>
+                      <p className="text-xl font-bold text-purple-500">
+                        {userSummary.summary.favorite_genre || "N/A"}
+                      </p>
+                    </div>
+                    <div className="bg-purple-500/20 p-3 rounded-lg">
+                      <Film className="w-8 h-8 text-purple-500" />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
 
             {/* Películas que me gustaron recientemente */}
-            {mockRecentLikes.length > 0 && (
+            {userSummary && userSummary.recent_reviews.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-2xl font-bold text-white mb-4">
                   Películas que me gustaron recientemente
                 </h3>
                 <div className="bg-slate-900/60 backdrop-blur-xl rounded-xl p-6 border border-slate-800/50">
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {mockRecentLikes.map((movie) => (
-                      <div key={movie.id} className="group relative">
+                    {userSummary.recent_reviews.map((movie) => (
+                      <a
+                        key={movie.slug}
+                        href={`/movie/${movie.slug}`}
+                        className="group relative block"
+                      >
                         <div className="relative h-64 rounded-lg overflow-hidden">
                           {movie.poster_path ? (
                             <img
@@ -245,7 +177,7 @@ export default function HomePage() {
                               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                             />
                           ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+                            <div className="w-full h-full bg-linear-to-br from-slate-800 to-slate-900 flex items-center justify-center">
                               <svg
                                 className="w-16 h-16 text-gray-600"
                                 fill="currentColor"
@@ -259,18 +191,15 @@ export default function HomePage() {
                               </svg>
                             </div>
                           )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+                          <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
                             <div className="text-white">
                               <p className="font-bold text-sm line-clamp-2">
                                 {movie.title}
                               </p>
-                              <p className="text-xs text-gray-300">
-                                {movie.release_year}
-                              </p>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -299,12 +228,13 @@ export default function HomePage() {
                 id="genre-filter"
                 value={selectedGenreId || ""}
                 onChange={handleGenreChange}
-                className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 text-gray-300 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block px-4 py-2.5 transition-all duration-200"
+                disabled={isLoadingMovies}
+                className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 text-gray-300 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block px-4 py-2.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">Todos los géneros</option>
-                {mockGenres.map((genre) => (
+                {genres.map((genre) => (
                   <option key={genre.id} value={genre.id}>
-                    {genre.name} ({genre.movies_count})
+                    {genre.genre_name}
                   </option>
                 ))}
               </select>
@@ -312,10 +242,14 @@ export default function HomePage() {
           </div>
 
           {/* Grid de películas */}
-          {filteredMovies.length > 0 ? (
+          {isLoadingMovies ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            </div>
+          ) : movies.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-              {filteredMovies.map((movie) => (
-                <MovieCard key={movie.id} movie={movie} />
+              {movies.map((movie) => (
+                <MovieCard key={movie.slug} movie={movie} />
               ))}
             </div>
           ) : (
@@ -342,28 +276,68 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* Paginación - Mock (en producción vendría del backend) */}
-          {filteredMovies.length > 0 && (
+          {/* Paginación */}
+          {pagination && pagination.last_page > 1 && (
             <div className="flex justify-center items-center space-x-2">
-              <button className="px-4 py-2 bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 text-gray-300 rounded-lg hover:border-blue-500/50 hover:text-blue-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || isLoadingMovies}
+                className="px-4 py-2 bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 text-gray-300 rounded-lg hover:border-blue-500/50 hover:text-blue-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Anterior
               </button>
-              <button className="px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold">
-                1
-              </button>
-              <button className="px-4 py-2 bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 text-gray-300 rounded-lg hover:border-blue-500/50 hover:text-blue-400 transition-all duration-200">
-                2
-              </button>
-              <button className="px-4 py-2 bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 text-gray-300 rounded-lg hover:border-blue-500/50 hover:text-blue-400 transition-all duration-200">
-                3
-              </button>
-              <button className="px-4 py-2 bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 text-gray-300 rounded-lg hover:border-blue-500/50 hover:text-blue-400 transition-all duration-200">
+
+              {/* Botones de páginas */}
+              {Array.from({ length: pagination.last_page }, (_, i) => i + 1)
+                .filter((page) => {
+                  // Mostrar primera, última, actual y páginas adyacentes
+                  return (
+                    page === 1 ||
+                    page === pagination.last_page ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  );
+                })
+                .map((page, index, array) => {
+                  // Agregar puntos suspensivos si hay gap
+                  const showEllipsis =
+                    index > 0 && array[index - 1] !== page - 1;
+                  return (
+                    <div key={page} className="flex items-center gap-1">
+                      {showEllipsis && (
+                        <span className="text-gray-500 px-2">...</span>
+                      )}
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        disabled={isLoadingMovies}
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${
+                          currentPage === page
+                            ? "bg-blue-500 text-white"
+                            : "bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 text-gray-300 hover:border-blue-500/50 hover:text-blue-400"
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {page}
+                      </button>
+                    </div>
+                  );
+                })}
+
+              <button
+                onClick={() =>
+                  setCurrentPage((prev) =>
+                    Math.min(pagination.last_page, prev + 1)
+                  )
+                }
+                disabled={
+                  currentPage === pagination.last_page || isLoadingMovies
+                }
+                className="px-4 py-2 bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 text-gray-300 rounded-lg hover:border-blue-500/50 hover:text-blue-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Siguiente
               </button>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }

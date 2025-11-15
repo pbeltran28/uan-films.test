@@ -5,67 +5,147 @@ import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, Loader2 } from "lucide-react";
+import { useGuestGuard } from "@/hooks/useAuthGuard";
+import { register, getGoogleAuthUrl } from "@/services/auth.service";
+import { toast } from "sonner";
+import { useAuthStore } from "@/store/auth.store";
+import { useRouter } from "next/navigation";
+import { registerSchema } from "@/schemas/register.schema";
 
 export default function CreateAccountPage() {
+  const { isChecking } = useGuestGuard();
+  const authStore = useAuthStore();
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
-
-  // Calcular la fortaleza de la contraseña
-  const getPasswordStrength = () => {
-    let strength = 0;
-    if (password.length >= 6) strength++;
-    if (password.match(/[a-z]/)) strength++;
-    if (password.match(/[A-Z]/)) strength++;
-    if (password.match(/[0-9]/)) strength++;
-    if (password.match(/[^a-zA-Z0-9]/)) strength++;
-    return strength;
-  };
-
-  const passwordStrength = getPasswordStrength();
-
-  const getPasswordStrengthText = () => {
-    if (password.length === 0) return "";
-    if (passwordStrength <= 2) return "Débil";
-    if (passwordStrength <= 3) return "Media";
-    return "Fuerte";
-  };
-
-  const getPasswordStrengthColor = () => {
-    if (passwordStrength <= 2) return "bg-red-500";
-    if (passwordStrength <= 3) return "bg-yellow-500";
-    return "bg-green-500";
-  };
+  const [showPasswordConfirmation, setShowPasswordConfirmation] =
+    useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
+    if (errors.name) {
+      setErrors((prev) => ({ ...prev, name: "" }));
+    }
   };
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
+    if (errors.email) {
+      setErrors((prev) => ({ ...prev, email: "" }));
+    }
   };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
+    if (errors.password) {
+      setErrors((prev) => ({ ...prev, password: "" }));
+    }
+    if (errors.password_confirmation) {
+      setErrors((prev) => ({ ...prev, password_confirmation: "" }));
+    }
   };
 
   const handlePasswordConfirmationChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     setPasswordConfirmation(e.target.value);
+    if (errors.password_confirmation) {
+      setErrors((prev) => ({ ...prev, password_confirmation: "" }));
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Lógica de registro pendiente
+
+    // Validar con Zod
+    const validationResult = registerSchema.safeParse({
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      password_confirmation: passwordConfirmation,
+    });
+
+    if (!validationResult.success) {
+      const fieldErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          fieldErrors[issue.path[0].toString()] = issue.message;
+        }
+      });
+      setErrors(fieldErrors);
+      toast.error("Por favor, corrige los errores en el formulario", {
+        duration: 3000,
+        position: "top-center",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      const {
+        isSuccess,
+        message,
+        user,
+        token,
+        errors: serverErrors,
+      } = await register({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        password_confirmation: passwordConfirmation,
+      });
+
+      if (!isSuccess) {
+        // Manejar errores de validación del servidor
+        if (serverErrors) {
+          setErrors(serverErrors);
+          toast.error("Por favor, corrige los errores en el formulario", {
+            duration: 3000,
+            position: "top-center",
+          });
+        } else {
+          toast.error(message || "Error al crear la cuenta", {
+            duration: 3000,
+            position: "top-center",
+          });
+        }
+        return;
+      }
+
+      if (!user || !token) {
+        toast.error("Error: No se recibieron los datos de autenticación", {
+          duration: 3000,
+          position: "top-center",
+        });
+        return;
+      }
+
+      authStore.login(user, token);
+      toast.success("¡Cuenta creada exitosamente!");
+      router.replace("/");
+    } catch (error) {
+      // Manejo de errores de red o inesperados
+      console.error("Error en registro:", error);
+      toast.error("Error de conexión. Por favor, intenta de nuevo.", {
+        duration: 3000,
+        position: "top-center",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleSignup = () => {
-    // Lógica de registro con Google pendiente
+    if (isLoading) return; // Prevenir múltiples clics
+    window.location.href = getGoogleAuthUrl();
   };
 
   const togglePasswordVisibility = () => {
@@ -75,6 +155,18 @@ export default function CreateAccountPage() {
   const togglePasswordConfirmationVisibility = () => {
     setShowPasswordConfirmation(!showPasswordConfirmation);
   };
+
+  // Mostrar loading mientras se verifica la autenticación
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-4 py-8">
@@ -91,10 +183,13 @@ export default function CreateAccountPage() {
 
         {/* Formulario de registro */}
         <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl p-6 md:p-8 border border-slate-800/50 animate-slide-up">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             {/* Nombre Completo */}
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-gray-300 text-sm font-medium">
+              <Label
+                htmlFor="name"
+                className="text-gray-300 text-sm font-medium"
+              >
                 Nombre Completo
               </Label>
               <div className="relative">
@@ -105,15 +200,34 @@ export default function CreateAccountPage() {
                   value={name}
                   onChange={handleNameChange}
                   placeholder="Tu nombre completo"
-                  className="pl-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200"
+                  className={`pl-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200 ${
+                    errors.name
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/30"
+                      : ""
+                  }`}
                   required
+                  disabled={isLoading}
+                  aria-invalid={!!errors.name}
+                  aria-describedby={errors.name ? "name-error" : undefined}
                 />
               </div>
+              {errors.name && (
+                <p
+                  id="name-error"
+                  className="text-sm text-red-400 mt-1"
+                  role="alert"
+                >
+                  {errors.name}
+                </p>
+              )}
             </div>
 
             {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-gray-300 text-sm font-medium">
+              <Label
+                htmlFor="email"
+                className="text-gray-300 text-sm font-medium"
+              >
                 Correo Electrónico
               </Label>
               <div className="relative">
@@ -124,10 +238,26 @@ export default function CreateAccountPage() {
                   value={email}
                   onChange={handleEmailChange}
                   placeholder="tu@email.com"
-                  className="pl-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200"
+                  className={`pl-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200 ${
+                    errors.email
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/30"
+                      : ""
+                  }`}
                   required
+                  disabled={isLoading}
+                  aria-invalid={!!errors.email}
+                  aria-describedby={errors.email ? "email-error" : undefined}
                 />
               </div>
+              {errors.email && (
+                <p
+                  id="email-error"
+                  className="text-sm text-red-400 mt-1"
+                  role="alert"
+                >
+                  {errors.email}
+                </p>
+              )}
             </div>
 
             {/* Contraseña */}
@@ -146,13 +276,23 @@ export default function CreateAccountPage() {
                   value={password}
                   onChange={handlePasswordChange}
                   placeholder="••••••••"
-                  className="pl-10 pr-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200"
+                  className={`pl-10 pr-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200 ${
+                    errors.password
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/30"
+                      : ""
+                  }`}
                   required
+                  disabled={isLoading}
+                  aria-invalid={!!errors.password}
+                  aria-describedby={
+                    errors.password ? "password-error" : undefined
+                  }
                 />
                 <button
                   type="button"
                   onClick={togglePasswordVisibility}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-400 transition-colors duration-200"
+                  disabled={isLoading}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-400 transition-colors duration-200 disabled:cursor-not-allowed"
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -161,6 +301,15 @@ export default function CreateAccountPage() {
                   )}
                 </button>
               </div>
+              {errors.password && (
+                <p
+                  id="password-error"
+                  className="text-sm text-red-400 mt-1"
+                  role="alert"
+                >
+                  {errors.password}
+                </p>
+              )}
             </div>
 
             {/* Confirmar Contraseña */}
@@ -179,13 +328,25 @@ export default function CreateAccountPage() {
                   value={passwordConfirmation}
                   onChange={handlePasswordConfirmationChange}
                   placeholder="••••••••"
-                  className="pl-10 pr-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200"
+                  className={`pl-10 pr-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200 ${
+                    errors.password_confirmation
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/30"
+                      : ""
+                  }`}
                   required
+                  disabled={isLoading}
+                  aria-invalid={!!errors.password_confirmation}
+                  aria-describedby={
+                    errors.password_confirmation
+                      ? "password_confirmation-error"
+                      : undefined
+                  }
                 />
                 <button
                   type="button"
                   onClick={togglePasswordConfirmationVisibility}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-400 transition-colors duration-200"
+                  disabled={isLoading}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-400 transition-colors duration-200 disabled:cursor-not-allowed"
                 >
                   {showPasswordConfirmation ? (
                     <EyeOff className="h-4 w-4" />
@@ -194,63 +355,31 @@ export default function CreateAccountPage() {
                   )}
                 </button>
               </div>
-            </div>
-
-            {/* Indicador de fortaleza de contraseña */}
-            {password.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-sm text-gray-400">
-                  Fortaleza de la contraseña:
-                </div>
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map((level) => (
-                    <div
-                      key={level}
-                      className={`h-2 rounded flex-1 transition-colors duration-300 ${
-                        level <= passwordStrength
-                          ? getPasswordStrengthColor()
-                          : "bg-gray-700"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <div
-                  className={`text-xs font-medium ${
-                    passwordStrength <= 2
-                      ? "text-red-400"
-                      : passwordStrength <= 3
-                      ? "text-yellow-400"
-                      : "text-green-400"
-                  }`}
+              {errors.password_confirmation && (
+                <p
+                  id="password_confirmation-error"
+                  className="text-sm text-red-400 mt-1"
+                  role="alert"
                 >
-                  {getPasswordStrengthText()}
-                </div>
-              </div>
-            )}
-
-            {/* Validación de coincidencia de contraseñas */}
-            {passwordConfirmation.length > 0 && (
-              <div className="text-xs">
-                {password === passwordConfirmation ? (
-                  <p className="text-green-400 flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full bg-green-400"></span>
-                    Las contraseñas coinciden
-                  </p>
-                ) : (
-                  <p className="text-red-400 flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full bg-red-400"></span>
-                    Las contraseñas no coinciden
-                  </p>
-                )}
-              </div>
-            )}
+                  {errors.password_confirmation}
+                </p>
+              )}
+            </div>
 
             {/* Botón de registro */}
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white font-semibold h-11 rounded-lg transition-all duration-300 transform hover:scale-[1.02] shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white font-semibold h-11 rounded-lg transition-all duration-300 transform hover:scale-[1.02] shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
-              Crear Cuenta
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creando cuenta...
+                </>
+              ) : (
+                "Crear Cuenta"
+              )}
             </Button>
 
             {/* Divisor */}
@@ -270,7 +399,8 @@ export default function CreateAccountPage() {
               type="button"
               onClick={handleGoogleSignup}
               variant="outline"
-              className="w-full bg-white hover:bg-gray-50 text-gray-900 font-semibold h-11 rounded-lg transition-all duration-300 transform hover:scale-[1.02] border-2 border-gray-200 hover:border-gray-300 shadow-md"
+              disabled={isLoading}
+              className="w-full bg-white hover:bg-gray-50 text-gray-900 font-semibold h-11 rounded-lg transition-all duration-300 transform hover:scale-[1.02] border-2 border-gray-200 hover:border-gray-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               <svg
                 className="h-5 w-5"

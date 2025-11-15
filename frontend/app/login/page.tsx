@@ -5,33 +5,136 @@ import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Mail, Lock } from "lucide-react";
+import { Mail, Lock, Loader2 } from "lucide-react";
+import { login, getGoogleAuthUrl } from "@/services/auth.service";
+import { toast } from "sonner";
+import { useAuthStore } from "@/store/auth.store";
+import { useRouter } from "next/navigation";
+import { loginSchema } from "@/schemas/login.schema";
+import { useGuestGuard } from "@/hooks/useAuthGuard";
 
 export default function LoginPage() {
+  const { isChecking } = useGuestGuard();
+  const authStore = useAuthStore();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
+    // Limpiar error cuando el usuario empiece a escribir
+    if (errors.email) {
+      setErrors((prev) => ({ ...prev, email: "" }));
+    }
   };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
+    // Limpiar error cuando el usuario empiece a escribir
+    if (errors.password) {
+      setErrors((prev) => ({ ...prev, password: "" }));
+    }
   };
 
   const handleRememberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setRemember(e.target.checked);
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    // Lógica de autenticación pendiente
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); // Prevenir recarga de página
+
+    // Validar con Zod
+    const validationResult = loginSchema.safeParse({
+      email: email.trim(),
+      password,
+      remember,
+    });
+
+    if (!validationResult.success) {
+      const fieldErrors: Record<string, string> = {};
+      validationResult.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          fieldErrors[issue.path[0].toString()] = issue.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      const {
+        isSuccess,
+        message,
+        user,
+        token,
+        errors: serverErrors,
+      } = await login({
+        email: email.trim(),
+        password,
+        remember,
+      });
+
+      if (!isSuccess) {
+        // Manejar errores de validación del servidor
+        if (serverErrors) {
+          setErrors(serverErrors);
+          toast.error("Por favor, corrige los errores en el formulario", {
+            duration: 3000,
+            position: "top-center",
+          });
+        } else {
+          toast.error(message || "Error al iniciar sesión", {
+            duration: 3000,
+            position: "top-center",
+          });
+        }
+        return;
+      }
+
+      if (!user || !token) {
+        toast.error("Error: No se recibieron los datos de autenticación", {
+          duration: 3000,
+          position: "top-center",
+        });
+        return;
+      }
+
+      authStore.login(user, token);
+      router.replace("/");
+    } catch (error) {
+      // Manejo de errores de red o inesperados
+      console.error("Error en login:", error);
+      toast.error("Error de conexión. Por favor, intenta de nuevo.", {
+        duration: 3000,
+        position: "top-center",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleLogin = () => {
-    // Lógica de autenticación con Google pendiente
+    if (isLoading) return; // Prevenir múltiples clics
+    window.location.href = getGoogleAuthUrl();
   };
+
+  // Mostrar loading mientras se verifica la autenticación
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-4">
@@ -48,10 +151,13 @@ export default function LoginPage() {
 
         {/* Formulario de login */}
         <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl p-6 md:p-8 border border-slate-800/50 animate-slide-up">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-gray-300 text-sm font-medium">
+              <Label
+                htmlFor="email"
+                className="text-gray-300 text-sm font-medium"
+              >
                 Correo Electrónico
               </Label>
               <div className="relative">
@@ -62,15 +168,34 @@ export default function LoginPage() {
                   value={email}
                   onChange={handleEmailChange}
                   placeholder="tu@email.com"
-                  className="pl-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200"
+                  className={`pl-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200 ${
+                    errors.email
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/30"
+                      : ""
+                  }`}
                   required
+                  disabled={isLoading}
+                  aria-invalid={!!errors.email}
+                  aria-describedby={errors.email ? "email-error" : undefined}
                 />
               </div>
+              {errors.email && (
+                <p
+                  id="email-error"
+                  className="text-sm text-red-400 mt-1"
+                  role="alert"
+                >
+                  {errors.email}
+                </p>
+              )}
             </div>
 
             {/* Contraseña */}
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-gray-300 text-sm font-medium">
+              <Label
+                htmlFor="password"
+                className="text-gray-300 text-sm font-medium"
+              >
                 Contraseña
               </Label>
               <div className="relative">
@@ -81,10 +206,28 @@ export default function LoginPage() {
                   value={password}
                   onChange={handlePasswordChange}
                   placeholder="••••••••"
-                  className="pl-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200"
+                  className={`pl-10 bg-slate-950/50 border-slate-700/50 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/30 h-11 transition-all duration-200 ${
+                    errors.password
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/30"
+                      : ""
+                  }`}
                   required
+                  disabled={isLoading}
+                  aria-invalid={!!errors.password}
+                  aria-describedby={
+                    errors.password ? "password-error" : undefined
+                  }
                 />
               </div>
+              {errors.password && (
+                <p
+                  id="password-error"
+                  className="text-sm text-red-400 mt-1"
+                  role="alert"
+                >
+                  {errors.password}
+                </p>
+              )}
             </div>
 
             {/* Recordar sesión */}
@@ -95,7 +238,8 @@ export default function LoginPage() {
                   id="remember"
                   checked={remember}
                   onChange={handleRememberChange}
-                  className="h-4 w-4 rounded border-slate-700 bg-slate-950/50 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                  disabled={isLoading}
+                  className="h-4 w-4 rounded border-slate-700 bg-slate-950/50 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer disabled:cursor-not-allowed"
                 />
                 <label
                   htmlFor="remember"
@@ -109,9 +253,17 @@ export default function LoginPage() {
             {/* Botón de login */}
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white font-semibold h-11 rounded-lg transition-all duration-300 transform hover:scale-[1.02] shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white font-semibold h-11 rounded-lg transition-all duration-300 transform hover:scale-[1.02] shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
-              Iniciar Sesión
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Iniciando sesión...
+                </>
+              ) : (
+                "Iniciar Sesión"
+              )}
             </Button>
 
             {/* Divisor */}
@@ -131,7 +283,8 @@ export default function LoginPage() {
               type="button"
               onClick={handleGoogleLogin}
               variant="outline"
-              className="w-full bg-white hover:bg-gray-50 text-gray-900 font-semibold h-11 rounded-lg transition-all duration-300 transform hover:scale-[1.02] border-2 border-gray-200 hover:border-gray-300 shadow-md"
+              disabled={isLoading}
+              className="w-full bg-white hover:bg-gray-50 text-gray-900 font-semibold h-11 rounded-lg transition-all duration-300 transform hover:scale-[1.02] border-2 border-gray-200 hover:border-gray-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               <svg
                 className="h-5 w-5"
@@ -178,11 +331,17 @@ export default function LoginPage() {
         <div className="mt-6 text-center text-xs text-gray-500">
           <p>
             Al iniciar sesión, aceptas nuestros{" "}
-            <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors">
+            <a
+              href="#"
+              className="text-blue-400 hover:text-blue-300 transition-colors"
+            >
               Términos de Servicio
             </a>{" "}
             y{" "}
-            <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors">
+            <a
+              href="#"
+              className="text-blue-400 hover:text-blue-300 transition-colors"
+            >
               Política de Privacidad
             </a>
           </p>

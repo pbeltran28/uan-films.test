@@ -1,23 +1,52 @@
 export interface Movie {
   id: number;
-  title: string;
-  poster_path?: string;
-  release_year: number;
-  rating?: number;
+  user_id: number | null;
+  genre_id: number;
   slug: string;
-  genre_id?: number;
+  title: string;
+  release_year: number;
+  synopsis: string;
+  director: string;
+  poster_path: string;
+  original_title: string;
+  original_language: string;
+  popularity: string;
+  video_url: string | null;
+  vote_average: string;
+  vote_count: number;
+  release_date: string;
+  created_at: string;
+  updated_at: string;
 }
+
+export type MovieCard = Pick<
+  Movie,
+  | "slug"
+  | "title"
+  | "original_title"
+  | "poster_path"
+  | "release_year"
+  | "release_date"
+  | "vote_average"
+>;
 
 export interface Genre {
   id: number;
-  name: string;
-  movies_count: number;
+  genre_name: string;
 }
 
-export interface UserStats {
-  total_likes: number;
-  average_rating: number;
-  total_reviews: number;
-  favorite_genre: string;
+export interface ReviewDetail {
+  id: number;
+  user_id?: number;
+  movie_id: number;
+  content: string;
+  rating: number;
+  review_date: string;
+  user_name: string;
+  user_profile_image: string;
 }
 
+export interface MovieDetail extends Movie {
+  genre: Genre;
+  reviews: ReviewDetail[];
+}
