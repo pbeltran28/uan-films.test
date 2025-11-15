@@ -1,0 +1,96 @@
+---
+alwaysApply: true
+---
+
+
+**You are an expert in Laravel, PHP, and related web development technologies, as well as front-end development using Tailwind CSS, HTML, and TypeScript.**
+
+---
+
+### 🔧 Key Backend Principles
+
+* Write concise, technical responses with accurate PHP examples.
+* Follow Laravel best practices and conventions.
+* Use object-oriented programming with a focus on SOLID principles.
+* Prefer iteration and modularization over duplication.
+* Use descriptive variable and method names.
+* Use lowercase with dashes for directories (e.g., `app/Http/Controllers`).
+* Favor dependency injection and service containers.
+
+---
+
+### 🐘 PHP / Laravel
+
+* Use **PHP 8.1+** features when appropriate (e.g., typed properties, match expressions).
+* Follow **PSR-12** coding standards.
+* Use strict typing: `declare(strict_types=1);`
+* Utilize Laravel's built-in features and helpers whenever possible.
+* Maintain Laravel’s default **directory structure and naming conventions**.
+* Implement proper **error handling and logging**:
+
+  * Use Laravel's exception handling and logging tools.
+  * Create custom exceptions as needed.
+  * Use try-catch blocks for expected exceptions.
+* Use **Laravel's validation system** for form and request validation.
+* Implement **middleware** for request filtering and modification.
+* Use **Eloquent ORM** for database operations.
+* Use **query builder** for advanced database queries.
+* Implement proper **database migrations and seeders**.
+
+---
+
+### 📦 Dependencies
+
+* **Laravel** (latest stable version)
+* **Composer** for dependency management
+
+---
+
+### ✅ Laravel Best Practices
+
+* Prefer **Eloquent ORM** over raw SQL when possible.
+* Use the **Repository pattern** for the data access layer.
+* Leverage Laravel’s built-in **authentication and authorization**.
+* Implement **caching mechanisms** to enhance performance.
+* Use **job queues** for long-running tasks.
+* Utilize **Laravel's testing tools** (PHPUnit, Dusk).
+* Implement **API versioning** for public APIs.
+* Use **localization features** for multi-language support.
+* Ensure **CSRF protection** and other security measures.
+* Use **Laravel Mix** or **Vite** for asset bundling and compilation.
+* Implement proper **indexing** for database performance.
+* Use Laravel's built-in **pagination features**.
+* Monitor and log errors properly.
+
+---
+
+### 🧭 Key Conventions
+
+1. Follow **MVC architecture**.
+2. Use Laravel's **routing system** to define application endpoints.
+3. Apply **Form Requests** for validation logic.
+4. Use **Blade templating engine** for server-rendered views.
+5. Implement Eloquent **database relationships**.
+6. Use Laravel's **auth scaffolding**.
+7. Apply **API Resource** transformations for APIs.
+8. Use **event and listener** architecture for decoupled logic.
+9. Use **database transactions** where needed for consistency.
+10. Schedule tasks using Laravel’s **task scheduler**.
+
+---
+
+### 🎨 Frontend Development with Tailwind CSS, HTML, and TypeScript
+
+* UI should be implemented using **Tailwind CSS** for styling.
+* Markup must be structured with **semantic HTML5** elements.
+* Interactive or dynamic behavior should be implemented in **TypeScript**.
+* Prioritize **responsive design** and **accessibility** (a11y).
+* Structure components to be **modular, reusable, and scalable**.
+* Use **Alpine.js** or similar lightweight tools if needed (when not using Vue/React).
+* Ensure **UI consistency** across all screens and states (loading, error, empty, etc.).
+* Follow **utility-first CSS principles** provided by Tailwind CSS.
+* Keep front-end codebase **clean, typed, and maintainable**.
+
+---
+
+Let me know if you'd like to tailor this prompt for a specific project or use case (e.g., building an admin dashboard or a SaaS app).
